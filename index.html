@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cloudflare WARP — Генератор конфигурации</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg: #000000;
+            --bg-card: rgba(255, 255, 255, 0.04);
+            --bg-card-hover: rgba(255, 255, 255, 0.06);
+            --bg-input: rgba(0, 0, 0, 0.3);
+            --bg-input-hover: rgba(0, 0, 0, 0.4);
+            --border: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(246, 130, 31, 0.5);
+            --text-primary: #f5f5f7;
+            --text-secondary: #86868b;
+            --accent: #f6821f;
+            --accent-hover: #ff9a3d;
+            --success: #30d158;
+            --error: #ff453a;
+        }
+
+        body {
+            min-height: 100vh;
+            background: var(--bg);
+            color: var(--text-primary);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            line-height: 1.5;
+            padding: 48px 24px;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            right: -30%;
+            width: 80%;
+            height: 80%;
+            background: radial-gradient(circle, rgba(246, 130, 31, 0.12) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            bottom: -30%;
+            left: -30%;
+            width: 70%;
+            height: 70%;
+            background: radial-gradient(circle, rgba(100, 100, 255, 0.08) 0%, transparent 70%);
+            filter: blur(80px);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 640px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 56px;
+        }
+
+        .logo {
+            width: 140px;
+            height: 96px;
+            margin: 0 auto 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo svg {
+            width: 100%;
+            height: 100%;
+            filter: drop-shadow(0 12px 40px rgba(246, 130, 31, 0.35));
+        }
+
+        h1 {
+            font-size: clamp(28px, 5vw, 38px);
+            font-weight: 600;
+            letter-spacing: -0.025em;
+            line-height: 1.15;
+            margin-bottom: 12px;
+            background: linear-gradient(180deg, #fff 0%, #a0a0a5 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            font-size: 17px;
+            color: var(--text-secondary);
+            font-weight: 400;
+            letter-spacing: -0.01em;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .field {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px 20px;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .field:hover {
+            background: var(--bg-card-hover);
+        }
+
+        .field:focus-within {
+            border-color: var(--border-focus);
+            background: var(--bg-card-hover);
+        }
+
+        .field-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+
+        select, input[type="text"], input[type="number"] {
+            width: 100%;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 14px;
+            color: var(--text-primary);
+            font-size: 15px;
+            font-family: inherit;
+            outline: none;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        select {
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%2386868b' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            padding-right: 40px;
+            cursor: pointer;
+        }
+
+        select:hover, input:hover {
+            background-color: var(--bg-input-hover);
+        }
+
+        select:focus, input:focus {
+            border-color: var(--border-focus);
+            background-color: var(--bg-input-hover);
+        }
+
+        select option {
+            background: #1a1a1a;
+            color: var(--text-primary);
+        }
+
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+        }
+
+        .radio-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .radio-option:hover {
+            background: rgba(0, 0, 0, 0.4);
+        }
+
+        .radio-option input[type="radio"] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            position: relative;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .radio-option input[type="radio"]:checked {
+            border-color: var(--accent);
+            background: var(--accent);
+        }
+
+        .radio-option input[type="radio"]:checked::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: #fff;
+            border-radius: 50%;
+        }
+
+        .radio-option span {
+            font-size: 15px;
+            color: var(--text-primary);
+        }
+
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .toggle-label {
+            font-size: 15px;
+            color: var(--text-primary);
+        }
+
+        .toggle {
+            position: relative;
+            width: 51px;
+            height: 31px;
+            flex-shrink: 0;
+        }
+
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: rgba(120, 120, 128, 0.32);
+            border-radius: 31px;
+            transition: background 0.3s ease;
+        }
+
+        .toggle-slider::before {
+            content: '';
+            position: absolute;
+            height: 27px;
+            width: 27px;
+            left: 2px;
+            top: 2px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent);
+        }
+
+        .toggle input:checked + .toggle-slider::before {
+            transform: translateX(20px);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .field-sub {
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 18px 32px;
+            margin-top: 12px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 14px;
+            font-size: 17px;
+            font-weight: 600;
+            font-family: inherit;
+            letter-spacing: -0.01em;
+            cursor: pointer;
+            transition: background 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+            box-shadow: 0 8px 24px rgba(246, 130, 31, 0.3);
+        }
+
+        .submit-btn:hover {
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 12px 32px rgba(246, 130, 31, 0.4);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 14px 18px;
+            border-radius: 12px;
+            font-size: 14px;
+            text-align: center;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.error {
+            background: rgba(255, 69, 58, 0.1);
+            border: 1px solid rgba(255, 69, 58, 0.3);
+            color: var(--error);
+        }
+
+        .status.success {
+            background: rgba(48, 209, 88, 0.1);
+            border: 1px solid rgba(48, 209, 88, 0.3);
+            color: var(--success);
+        }
+
+        .status.loading {
+            background: rgba(246, 130, 31, 0.1);
+            border: 1px solid rgba(246, 130, 31, 0.3);
+            color: var(--accent);
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .footer a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer a:hover {
+            color: var(--text-primary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="logo">
+                <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <defs>
+                        <linearGradient id="cfGradientTop" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#FBAD41"/>
+                            <stop offset="100%" stop-color="#F6821F"/>
+                        </linearGradient>
+                    </defs>
+                    <path fill="url(#cfGradientTop)" d="M86.5 34.2c-.3-.1-.7-.1-1.1-.1l-1.1.1c-.3 0-.6-.2-.7-.5l-.4-1.6c-.5-1.9-2.2-3.3-4.2-3.3-1.9 0-3.6 1.2-4.2 3L70 44.5c-.1.4-.5.7-.9.7H2.6c-.3 0-.6.2-.6.5s.1.6.4.7c.3.1.6.2.9.3h67.2c.4 0 .8-.3.9-.7l4.3-12.7c.1-.3.4-.5.7-.5h2.7c.4 0 .8-.2 1-.6.1-.3.2-.6.3-.9.2-1.9-.9-3.6-2.7-4.1-.3-.1-.7-.1-1.2-.1z"/>
+                    <path fill="url(#cfGradientTop)" d="M76.3 14.6c-.7-.1-1.4-.1-2.1-.1-1.1 0-2.2.2-3.2.4-1.4-5.6-6.5-9.7-12.5-9.7-3.9 0-7.5 1.8-9.9 4.6-1-4.3-4.9-7.5-9.5-7.5-4.7 0-8.7 3.3-9.6 7.7-4.7.4-8.5 4.4-8.5 9.3 0 .6.1 1.1.2 1.7-.3 0-.6-.1-.9-.1C10.5 20.9 4 27.4 4 35.4c0 1.1.2 2.2.5 3.2h62c.3 0 .6-.2.7-.5l1-3c.2-.6.8-1 1.5-1h1.2c3.7 0 6.7-3 6.7-6.7 0-3.2-2.2-5.8-5.2-6.5-.4-1.7-1.5-3.2-2.9-4.2-.3-.5-.7-1.1-1.2-1.5-1.7-1.4-3.9-2.2-6.2-2.2-.2 0-.4 0-.6 0 .6-.8 1-1.8 1.2-2.9.5-.7 1.1-1.3 1.8-1.9.7-.3 1.5-.4 2.2-.4.6 0 1.2.1 1.8.3z"/>
+                </svg>
+            </div>
+            <h1>Cloudflare WARP</h1>
+            <p class="subtitle">Генератор конфигурации для AmneziaVPN</p>
+        </header>
+
+        <form id="configForm">
+            <div class="field">
+                <label class="field-label" for="dns">DNS-сервер</label>
+                <select id="dns">
+                    <option value="1">Cloudflare</option>
+                    <option value="2">Google</option>
+                    <option value="3">Quad9</option>
+                    <option value="4">AdGuard</option>
+                    <option value="5">Comss.one</option>
+                    <option value="6">XBoxDNS</option>
+                    <option value="7">GeoHide</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <span class="field-label">Режим маршрутизации</span>
+                <div class="radio-group">
+                    <label class="radio-option">
+                        <input type="radio" name="routing" value="all" checked>
+                        <span>Весь трафик через VPN</span>
+                    </label>
+                    <label class="radio-option">
+                        <input type="radio" name="routing" value="lan">
+                        <span>Исключить локальную сеть</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="jc">Параметры Jc / Jmin / Jmax</label>
+                <select id="jc">
+                    <option value="1">Jc = 3, Jmin = 10, Jmax = 30</option>
+                    <option value="2">Jc = 4, Jmin = 40, Jmax = 70</option>
+                    <option value="3">Jc = 6, Jmin = 70, Jmax = 100</option>
+                    <option value="4" selected>Jc = 120, Jmin = 23, Jmax = 911</option>
+                    <option value="5">Свои значения</option>
+                </select>
+                <div id="jcCustom" class="field-sub hidden">
+                    <input type="number" id="jcVal" placeholder="Jc (по умолчанию 120)" min="0">
+                    <input type="number" id="jminVal" placeholder="Jmin (по умолчанию 23)" min="0">
+                    <input type="number" id="jmaxVal" placeholder="Jmax (по умолчанию 911)" min="0">
+                </div>
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="mtu">MTU</label>
+                <input type="number" id="mtu" value="1280" min="576" max="1500">
+            </div>
+
+            <div class="field">
+                <label class="field-label" for="endpoint">Конечная точка (Endpoint)</label>
+                <select id="endpoint">
+                    <option value="1">162.159.192.1:500</option>
+                    <option value="2">162.159.195.1:500</option>
+                    <option value="3">engage.cloudflareclient.com:2408</option>
+                </select>
+            </div>
+
+            <div class="field">
+                <div class="toggle-row">
+                    <span class="toggle-label">Включить IPv6</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="ipv6" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="toggle-row">
+                    <span class="toggle-label">PersistentKeepalive</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="keepalive" checked>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div id="keepaliveValue" class="field-sub">
+                    <input type="number" id="keepaliveSec" value="25" min="0" placeholder="Значение в секундах">
+                </div>
+            </div>
+
+            <div class="field">
+                <div class="toggle-row">
+                    <span class="toggle-label">Собственный I1 по домену</span>
+                    <label class="toggle">
+                        <input type="checkbox" id="customI1">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div id="i1Domain" class="field-sub hidden">
+                    <input type="text" id="i1DomainValue" placeholder="example.com">
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">
+                Сгенерировать конфигурацию
+            </button>
+        </form>
+
+        <div class="status" id="status"></div>
+
+        <div class="footer">
+            <a href="https://github.com/smi-falcon/Cloudflare-WARP" target="_blank" rel="noopener">GitHub</a>
+        </div>
+    </div>
+
+    <script>
+        const jcSelect = document.getElementById('jc');
+        const jcCustom = document.getElementById('jcCustom');
+        const keepaliveToggle = document.getElementById('keepalive');
+        const keepaliveValue = document.getElementById('keepaliveValue');
+        const customI1Toggle = document.getElementById('customI1');
+        const i1DomainBlock = document.getElementById('i1Domain');
+        const statusEl = document.getElementById('status');
+        const submitBtn = document.getElementById('submitBtn');
+
+        jcSelect.addEventListener('change', () => {
+            jcCustom.classList.toggle('hidden', jcSelect.value !== '5');
+        });
+
+        keepaliveToggle.addEventListener('change', () => {
+            keepaliveValue.classList.toggle('hidden', !keepaliveToggle.checked);
+        });
+
+        customI1Toggle.addEventListener('change', () => {
+            i1DomainBlock.classList.toggle('hidden', !customI1Toggle.checked);
+        });
+
+        function setStatus(message, type) {
+            statusEl.textContent = message;
+            statusEl.className = 'status show ' + type;
+        }
+
+        async function generateConfig(event) {
+            event.preventDefault();
+            submitBtn.disabled = true;
+            setStatus('Генерация...', 'loading');
+
+            try {
+                const jcChoice = jcSelect.value;
+                const payload = {
+                    dnsChoice: document.getElementById('dns').value,
+                    routing: document.querySelector('input[name="routing"]:checked').value,
+                    jcChoice: jcChoice,
+                    mtu: parseInt(document.getElementById('mtu').value, 10) || 1280,
+                    endpointChoice: document.getElementById('endpoint').value,
+                    ipv6: document.getElementById('ipv6').checked,
+                    keepaliveOn: keepaliveToggle.checked,
+                    keepaliveSec: parseInt(document.getElementById('keepaliveSec').value, 10) || 25,
+                    customI1: customI1Toggle.checked,
+                    i1Domain: document.getElementById('i1DomainValue').value.trim()
+                };
+
+                if (jcChoice === '5') {
+                    payload.jcCustom = {
+                        jc: document.getElementById('jcVal').value,
+                        jmin: document.getElementById('jminVal').value,
+                        jmax: document.getElementById('jmaxVal').value
+                    };
+                }
+
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    let message = 'Ошибка генерации';
+                    try {
+                        const data = await response.json();
+                        if (data && data.error) message = data.error;
+                    } catch (_) {}
+                    throw new Error(message);
+                }
+
+                const configText = await response.text();
+
+                const blob = new Blob([configText], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'cloudflare-warp.conf';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                setStatus('Конфигурация успешно сгенерирована и скачана!', 'success');
+            } catch (error) {
+                setStatus('Ошибка: ' + error.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+            }
+        }
+
+        document.getElementById('configForm').addEventListener('submit', generateConfig);
+    </script>
+</body>
+</html>
