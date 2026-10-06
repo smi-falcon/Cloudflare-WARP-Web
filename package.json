@@ -1,0 +1,12 @@
+{
+  "name": "cloudflare-warp-generator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@noble/curves": "^1.4.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
