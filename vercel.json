@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/api/generate",
+      "destination": "/api/generate.js"
+    }
+  ],
+  "functions": {
+    "api/generate.js": {
+      "maxDuration": 30
+    }
+  }
+}
