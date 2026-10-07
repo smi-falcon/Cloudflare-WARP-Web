@@ -65,6 +65,7 @@ export default async function handler(req, res) {
       jcCustom,
       mtu = 1280,
       endpointChoice = '1',
+      endpointCustom = '',
       ipv6 = true,
       keepaliveOn = true,
       keepaliveSec = 25,
@@ -89,6 +90,25 @@ export default async function handler(req, res) {
     switch (endpointChoice) {
       case '2': ENDPOINT_HOST = '162.159.195.1'; ENDPOINT_PORT = 500; break;
       case '3': ENDPOINT_HOST = 'engage.cloudflareclient.com'; ENDPOINT_PORT = 2408; break;
+      case '4': {
+        const custom = String(endpointCustom).trim();
+        const separatorIndex = custom.lastIndexOf(':');
+        if (separatorIndex > 0) {
+          const host = custom.slice(0, separatorIndex).trim();
+          const port = custom.slice(separatorIndex + 1).trim();
+          if (host && /^\d+$/.test(port) && parseInt(port, 10) > 0 && parseInt(port, 10) <= 65535) {
+            ENDPOINT_HOST = host;
+            ENDPOINT_PORT = parseInt(port, 10);
+          } else {
+            ENDPOINT_HOST = '162.159.192.1';
+            ENDPOINT_PORT = 500;
+          }
+        } else {
+          ENDPOINT_HOST = '162.159.192.1';
+          ENDPOINT_PORT = 500;
+        }
+        break;
+      }
       default: ENDPOINT_HOST = '162.159.192.1'; ENDPOINT_PORT = 500;
     }
 
