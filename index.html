@@ -479,7 +479,11 @@
                     <option value="1">162.159.192.1:500</option>
                     <option value="2">162.159.195.1:500</option>
                     <option value="3">engage.cloudflareclient.com:2408</option>
+                    <option value="4">Указать свой адрес</option>
                 </select>
+                <div id="customEndpoint" class="field-sub hidden">
+                    <input type="text" id="customEndpointValue" placeholder="host:port">
+                </div>
             </div>
 
             <div class="field">
@@ -537,6 +541,8 @@
         const keepaliveValue = document.getElementById('keepaliveValue');
         const customI1Toggle = document.getElementById('customI1');
         const i1DomainBlock = document.getElementById('i1Domain');
+        const endpointSelect = document.getElementById('endpoint');
+        const customEndpointBlock = document.getElementById('customEndpoint');
         const statusEl = document.getElementById('status');
         const submitBtn = document.getElementById('submitBtn');
 
@@ -552,6 +558,10 @@
             i1DomainBlock.classList.toggle('hidden', !customI1Toggle.checked);
         });
 
+        endpointSelect.addEventListener('change', () => {
+            customEndpointBlock.classList.toggle('hidden', endpointSelect.value !== '4');
+        });
+
         function setStatus(message, type) {
             statusEl.textContent = message;
             statusEl.className = 'status show ' + type;
@@ -564,12 +574,13 @@
 
             try {
                 const jcChoice = jcSelect.value;
+                const endpointChoice = endpointSelect.value;
                 const payload = {
                     dnsChoice: document.getElementById('dns').value,
                     routing: document.querySelector('input[name="routing"]:checked').value,
                     jcChoice: jcChoice,
                     mtu: parseInt(document.getElementById('mtu').value, 10) || 1280,
-                    endpointChoice: document.getElementById('endpoint').value,
+                    endpointChoice: endpointChoice,
                     ipv6: document.getElementById('ipv6').checked,
                     keepaliveOn: keepaliveToggle.checked,
                     keepaliveSec: parseInt(document.getElementById('keepaliveSec').value, 10) || 25,
@@ -583,6 +594,10 @@
                         jmin: document.getElementById('jminVal').value,
                         jmax: document.getElementById('jmaxVal').value
                     };
+                }
+
+                if (endpointChoice === '4') {
+                    payload.endpointCustom = document.getElementById('customEndpointValue').value.trim();
                 }
 
                 const response = await fetch('/api/generate', {
