@@ -120,6 +120,60 @@
             gap: 20px;
         }
 
+        .mode-tabs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 6px;
+            margin-bottom: 20px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+        }
+
+        .mode-tab {
+            padding: 12px 16px;
+            color: var(--text-secondary);
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            font-family: inherit;
+            cursor: pointer;
+            transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+        }
+
+        .mode-tab:hover {
+            color: var(--text-primary);
+        }
+
+        .mode-tab[aria-selected="true"] {
+            color: var(--text-primary);
+            background: rgba(246, 130, 31, 0.12);
+            border-color: rgba(246, 130, 31, 0.28);
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.16);
+        }
+
+        .mode-panel[hidden] {
+            display: none;
+        }
+
+        .mode-description {
+            padding: 16px 18px;
+            color: var(--text-secondary);
+            background: rgba(246, 130, 31, 0.06);
+            border: 1px solid rgba(246, 130, 31, 0.16);
+            border-radius: 14px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .mode-description strong {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
         .field {
             background: var(--bg-card);
             border: 1px solid var(--border);
@@ -342,6 +396,26 @@
             box-shadow: 0 12px 32px rgba(246, 130, 31, 0.4);
         }
 
+        .submit-btn--purple {
+            background: #8b5cf6;
+            box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
+        }
+
+        .submit-btn--purple:hover {
+            background: #a78bfa;
+            box-shadow: 0 12px 32px rgba(139, 92, 246, 0.4);
+        }
+
+        .submit-btn--red {
+            background: #e5484d;
+            box-shadow: 0 8px 24px rgba(229, 72, 77, 0.28);
+        }
+
+        .submit-btn--red:hover {
+            background: #f2696d;
+            box-shadow: 0 12px 32px rgba(229, 72, 77, 0.38);
+        }
+
         .submit-btn:active {
             transform: translateY(0);
         }
@@ -421,9 +495,15 @@
                 </svg>
             </div>
             <h1>Cloudflare WARP</h1>
-            <p class="subtitle">Генератор конфигурации для AmneziaVPN / AmneziaWG</p>
+            <p class="subtitle">Генератор конфигураций Cloudflare WARP</p>
         </header>
 
+        <div class="mode-tabs" role="tablist" aria-label="Тип конфигурации">
+            <button class="mode-tab" id="tab-amnezia" type="button" role="tab" aria-selected="true" aria-controls="panel-amnezia">WARP</button>
+            <button class="mode-tab" id="tab-masque" type="button" role="tab" aria-selected="false" aria-controls="panel-masque">MASQUE</button>
+        </div>
+
+        <section class="mode-panel" id="panel-amnezia" role="tabpanel" aria-labelledby="tab-amnezia">
         <form id="configForm">
             <div class="field">
                 <label class="field-label" for="dns">DNS-сервер</label>
@@ -525,10 +605,36 @@
                 </div>
             </div>
 
+            <button type="button" class="submit-btn submit-btn--red" id="amneziaVpnBtn">
+                Скопировать ключ для AmneziaVPN
+            </button>
             <button type="submit" class="submit-btn" id="submitBtn">
                 Сгенерировать конфигурацию
             </button>
         </form>
+        </section>
+
+        <section class="mode-panel" id="panel-masque" role="tabpanel" aria-labelledby="tab-masque" hidden>
+            <form id="masqueForm">
+                <div class="mode-description"><strong>WARP поверх HTTP/3.</strong> Создайте YAML-профиль для Clash Verge с отдельной регистрацией MASQUE.</div>
+                <div class="field">
+                    <label class="field-label" for="masqueDns">DNS-серверы</label>
+                    <select id="masqueDns">
+                        <option value="1">Cloudflare</option>
+                        <option value="2">Google</option>
+                        <option value="3">Quad9</option>
+                        <option value="4">AdGuard</option>
+                        <option value="5">Comss.one</option>
+                        <option value="6">XBoxDNS</option>
+                        <option value="7">GeoHide</option>
+                        <option value="8">Bezmezhau</option>
+                        <option value="9">DNS-AI</option>
+                        <option value="10">ZapretDNS</option>
+                    </select>
+                </div>
+                <button type="submit" class="submit-btn submit-btn--purple" id="masqueSubmitBtn">Сгенерировать конфигурацию</button>
+            </form>
+        </section>
 
         <div class="status" id="status"></div>
 
@@ -548,6 +654,19 @@
         const customEndpointBlock = document.getElementById('customEndpoint');
         const statusEl = document.getElementById('status');
         const submitBtn = document.getElementById('submitBtn');
+        const amneziaVpnBtn = document.getElementById('amneziaVpnBtn');
+        const masqueSubmitBtn = document.getElementById('masqueSubmitBtn');
+        const modeTabs = document.querySelectorAll('.mode-tab');
+
+        modeTabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const isMasque = tab.id === 'tab-masque';
+                modeTabs.forEach(modeTab => modeTab.setAttribute('aria-selected', String(modeTab === tab)));
+                document.getElementById('panel-amnezia').hidden = isMasque;
+                document.getElementById('panel-masque').hidden = !isMasque;
+                statusEl.className = 'status';
+            });
+        });
 
         jcSelect.addEventListener('change', () => {
             jcCustom.classList.toggle('hidden', jcSelect.value !== '5');
@@ -570,10 +689,29 @@
             statusEl.className = 'status show ' + type;
         }
 
-        async function generateConfig(event) {
+        async function copyToClipboard(value) {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(value);
+                return;
+            }
+
+            const temporaryInput = document.createElement('textarea');
+            temporaryInput.value = value;
+            temporaryInput.setAttribute('readonly', '');
+            temporaryInput.style.position = 'fixed';
+            temporaryInput.style.opacity = '0';
+            document.body.appendChild(temporaryInput);
+            temporaryInput.select();
+            const copied = document.execCommand('copy');
+            temporaryInput.remove();
+            if (!copied) throw new Error('Не удалось скопировать ключ в буфер обмена');
+        }
+
+        async function generateConfig(event, outputType = 'config') {
             event.preventDefault();
-            submitBtn.disabled = true;
-            setStatus('Генерация...', 'loading');
+            const activeButton = outputType === 'amneziaVpn' ? amneziaVpnBtn : submitBtn;
+            activeButton.disabled = true;
+            setStatus(outputType === 'amneziaVpn' ? 'Создаём ключ AmneziaVPN...' : 'Генерация...', 'loading');
 
             try {
                 const jcChoice = jcSelect.value;
@@ -588,7 +726,8 @@
                     keepaliveOn: keepaliveToggle.checked,
                     keepaliveSec: parseInt(document.getElementById('keepaliveSec').value, 10) || 25,
                     customI1: customI1Toggle.checked,
-                    i1Domain: document.getElementById('i1DomainValue').value.trim()
+                    i1Domain: document.getElementById('i1DomainValue').value.trim(),
+                    outputType
                 };
 
                 if (jcChoice === '5') {
@@ -620,25 +759,72 @@
 
                 const configText = await response.text();
 
-                const blob = new Blob([configText], { type: 'text/plain' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = 'cloudflare-warp.conf';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                URL.revokeObjectURL(url);
-
-                setStatus('Конфигурация успешно сгенерирована и скачана!', 'success');
+                if (outputType === 'amneziaVpn') {
+                    await copyToClipboard(configText);
+                    setStatus('Ключ AmneziaVPN скопирован в буфер обмена!', 'success');
+                } else {
+                    const blob = new Blob([configText], { type: 'text/plain' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'cloudflare-warp.conf';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                    setStatus('Конфигурация успешно сгенерирована и скачана!', 'success');
+                }
             } catch (error) {
                 setStatus('Ошибка: ' + error.message, 'error');
             } finally {
-                submitBtn.disabled = false;
+                activeButton.disabled = false;
             }
         }
 
         document.getElementById('configForm').addEventListener('submit', generateConfig);
+        amneziaVpnBtn.addEventListener('click', event => generateConfig(event, 'amneziaVpn'));
+
+        document.getElementById('masqueForm').addEventListener('submit', async event => {
+            event.preventDefault();
+            masqueSubmitBtn.disabled = true;
+            setStatus('Регистрируем MASQUE и собираем YAML...', 'loading');
+
+            try {
+                const response = await fetch('/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        protocol: 'masque',
+                        dnsChoice: document.getElementById('masqueDns').value
+                    })
+                });
+
+                if (!response.ok) {
+                    let message = 'Ошибка генерации MASQUE';
+                    try {
+                        const data = await response.json();
+                        if (data && data.error) message = data.error;
+                    } catch (_) {}
+                    throw new Error(message);
+                }
+
+                const configText = await response.text();
+                const blob = new Blob([configText], { type: 'text/yaml' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'cloudflare-warp-masque.yaml';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                setStatus('YAML-конфигурация MASQUE успешно сгенерирована и скачана!', 'success');
+            } catch (error) {
+                setStatus('Ошибка: ' + error.message, 'error');
+            } finally {
+                masqueSubmitBtn.disabled = false;
+            }
+        });
     </script>
 </body>
 </html>
