@@ -74,7 +74,8 @@ async function masqueApiRequest(method, path, token, body) {
   const response = await fetch(`https://api.cloudflareclient.com/v0a4471/${path}`, options);
   const data = await response.json();
   if (!response.ok || data.success === false) {
-    throw new Error(data.errors?.[0]?.message || 'Ошибка регистрации MASQUE в Cloudflare');
+    const apiError = data.errors?.map(error => error.message || error.code).filter(Boolean).join('; ');
+    throw new Error(`Cloudflare API вернул HTTP ${response.status}${apiError ? `: ${apiError}` : ''}`);
   }
   return data;
 }
@@ -101,7 +102,7 @@ async function generateMasqueConfig({ dnsChoice = '1' } = {}) {
     serial_number: serial,
     tos: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
   });
-  const account = registration.result;
+  const account = registration.result?.id && registration.result?.token ? registration.result : registration;
   if (!account?.id || !account?.token) throw new Error('Не удалось зарегистрировать аккаунт Cloudflare');
 
   const enrollment = await masqueApiRequest('PATCH', `reg/${account.id}`, account.token, {
@@ -168,7 +169,7 @@ ${dnsServers}
       - IP-CIDR,172.16.0.0/12,DIRECT
       - IP-CIDR,192.168.0.0/16,DIRECT
       - IP-CIDR,224.0.0.0/4,DIRECT
-      - IP-CIDR,255.255.255.255/32,DIRECT	
+      - IP-CIDR,255.255.255.255/32,DIRECT
       - IP-CIDR,127.0.0.0/8,DIRECT
       - MATCH,PROXY
     `;
