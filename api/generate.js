@@ -1,4 +1,5 @@
 import { x25519 } from '@noble/curves/ed25519';
+import { generateKeyPairSync, randomBytes } from 'node:crypto';
 
 const DNS_MAP = {
   '1': { v4: ['1.1.1.1', '1.0.0.1'], v6: ['2606:4700:4700::1111', '2606:4700:4700::1001'] },
@@ -29,6 +30,13 @@ function generateKeypair() {
   return { priv: bytesToBase64(privBytes), pub: bytesToBase64(pubBytes) };
 }
 
+function dedentConfig(config) {
+  const lines = config.split('\n');
+  const firstContentLine = lines.find(line => line.trim());
+  const indentation = firstContentLine.match(/^\s*/)[0].length;
+  return lines.map(line => line.trim() ? line.slice(indentation) : '').join('\n').trim();
+}
+
 async function generateCustomI1(domain) {
   let seed = domain;
   let result = '';
@@ -54,6 +62,119 @@ async function apiRequest(method, path, token, body) {
   return res.json();
 }
 
+async function masqueApiRequest(method, path, token, body) {
+  const headers = {
+    'Content-Type': 'application/json; charset=UTF-8',
+    'User-Agent': 'WARP for Android',
+    'CF-Client-Version': 'a-6.35-4471'
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const options = { method, headers };
+  if (body) options.body = JSON.stringify(body);
+  const response = await fetch(`https://api.cloudflareclient.com/v0a4471/${path}`, options);
+  const data = await response.json();
+  if (!response.ok || data.success === false) {
+    throw new Error(data.errors?.[0]?.message || 'Ошибка регистрации MASQUE в Cloudflare');
+  }
+  return data;
+}
+
+async function generateMasqueConfig({ dnsChoice = '1' } = {}) {
+  const { publicKey, privateKey } = generateKeyPairSync('ec', {
+    namedCurve: 'prime256v1',
+    publicKeyEncoding: { type: 'spki', format: 'der' },
+    privateKeyEncoding: { type: 'sec1', format: 'der' }
+  });
+  const privateKeyBase64 = privateKey.toString('base64');
+  const publicKeyBase64 = publicKey.toString('base64');
+  const wgKey = randomBytes(32).toString('base64');
+  const serial = randomBytes(8).toString('hex');
+  const registration = await masqueApiRequest('POST', 'reg', null, {
+    key: wgKey,
+    key_type: 'curve25519',
+    tunnel_type: 'wireguard',
+    fcm_token: '',
+    install_id: '',
+    locale: 'en_US',
+    model: 'PC',
+    os_version: '',
+    serial_number: serial,
+    tos: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+  });
+  const account = registration.result;
+  if (!account?.id || !account?.token) throw new Error('Не удалось зарегистрировать аккаунт Cloudflare');
+
+  const enrollment = await masqueApiRequest('PATCH', `reg/${account.id}`, account.token, {
+    key: publicKeyBase64,
+    key_type: 'secp256r1',
+    tunnel_type: 'masque'
+  });
+  const config = enrollment.result?.config || enrollment.config;
+  const peer = config?.peers?.[0];
+  const peerPublicKey = String(peer?.public_key || '').replace(/-----BEGIN PUBLIC KEY-----|-----END PUBLIC KEY-----|\s/g, '');
+  const clientIPv4 = config?.interface?.addresses?.v4;
+  const clientIPv6 = config?.interface?.addresses?.v6;
+  const rawServer = peer?.endpoint?.v4 || '162.159.192.1';
+  const server = String(rawServer).replace(/:\\d+$/, '') || '162.159.192.1';
+  if (!peerPublicKey || !clientIPv4 || !clientIPv6) throw new Error('Cloudflare не вернул параметры конфигурации MASQUE');
+
+  const dns = DNS_MAP[dnsChoice] || DNS_MAP['1'];
+  const dnsServers = [...dns.v4, ...dns.v6].map(address => `        - ${address}`).join('\n');
+  const masqueConfig = `
+    port: 7890
+    socks-port: 7891
+    mixed-port: 7892
+    allow-lan: true
+    mode: rule
+    log-level: error
+    ipv6: true
+
+    dns:
+      enable: true
+      listen: 0.0.0.0:1053
+      ipv6: true
+      enhanced-mode: fake-ip
+      fake-ip-range: 198.18.0.1/16
+      nameserver:
+${dnsServers}
+
+    proxies:
+      - name: WARP-Masque
+        type: masque
+        server: ${server}
+        port: 443
+        private-key: "${privateKeyBase64}"
+        public-key: "${peerPublicKey}"
+        ip: ${clientIPv4}
+        ipv6: ${clientIPv6}
+        mtu: 1280
+        udp: true
+        sni: consumer-masque.cloudflareclient.com
+        skip-cert-verify: false
+        network: h3
+        remote-dns-resolve: true
+        dns: [1.1.1.1, 8.8.8.8]
+
+    proxy-groups:
+      - name: PROXY
+        type: select
+        proxies:
+          - WARP-Masque
+
+    rules:
+      - IP-CIDR,10.0.0.0/8,DIRECT
+      - IP-CIDR,100.64.0.0/10,DIRECT
+      - IP-CIDR,169.254.0.0/16,DIRECT
+      - IP-CIDR,172.16.0.0/12,DIRECT
+      - IP-CIDR,192.168.0.0/16,DIRECT
+      - IP-CIDR,224.0.0.0/4,DIRECT
+      - IP-CIDR,255.255.255.255/32,DIRECT	
+      - IP-CIDR,127.0.0.0/8,DIRECT
+      - MATCH,PROXY
+    `;
+  return dedentConfig(masqueConfig);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
@@ -73,8 +194,18 @@ export default async function handler(req, res) {
       keepaliveOn = true,
       keepaliveSec = 25,
       customI1 = false,
-      i1Domain = ''
+      i1Domain = '',
+      protocol = 'amnezia',
+      outputType = 'config'
     } = req.body;
+
+    if (protocol === 'masque') {
+      const masqueConfig = await generateMasqueConfig({ dnsChoice });
+      res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="cloudflare-masque.yaml"');
+      res.status(200).send(masqueConfig);
+      return;
+    }
 
     let JC, JMIN, JMAX;
     switch (jcChoice) {
@@ -157,29 +288,73 @@ export default async function handler(req, res) {
     const ADDRESS_LINE = ipv6 ? `${clientIPv4}, ${clientIPv6}` : clientIPv4;
     const KEEPALIVE_LINE = keepaliveOn ? `PersistentKeepalive = ${keepaliveSec}` : '';
 
-    const config = `[Interface]
-PrivateKey = ${priv}
-Jc = ${JC}
-Jmin = ${JMIN}
-Jmax = ${JMAX}
-S1 = 0
-S2 = 0
-S3 = 0
-S4 = 0
-H1 = 1
-H2 = 2
-H3 = 3
-H4 = 4
-I1 = ${I1_FINAL}
-Address = ${ADDRESS_LINE}
-DNS = ${DNS_LINE}
-MTU = ${mtu}
+    const config = dedentConfig(`
+        [Interface]
+        PrivateKey = ${priv}
+        Jc = ${JC}
+        Jmin = ${JMIN}
+        Jmax = ${JMAX}
+        S1 = 0
+        S2 = 0
+        S3 = 0
+        S4 = 0
+        H1 = 1
+        H2 = 2
+        H3 = 3
+        H4 = 4
+        I1 = ${I1_FINAL}
+        Address = ${ADDRESS_LINE}
+        DNS = ${DNS_LINE}
+        MTU = ${mtu}
 
-[Peer]
-PublicKey = ${peerPub}
-AllowedIPs = ${ALLOWED_IPS}
-Endpoint = ${ENDPOINT_HOST}:${ENDPOINT_PORT}
-${KEEPALIVE_LINE}`.trim() + '\n';
+        [Peer]
+        PublicKey = ${peerPub}
+        AllowedIPs = ${ALLOWED_IPS}
+        Endpoint = ${ENDPOINT_HOST}:${ENDPOINT_PORT}
+        ${KEEPALIVE_LINE}`) + '\n';
+
+    if (outputType === 'amneziaVpn') {
+      const awgConfig = {
+        client_priv_key: priv,
+        Jc: String(JC),
+        Jmin: String(JMIN),
+        Jmax: String(JMAX),
+        S1: '0',
+        S2: '0',
+        S3: '0',
+        S4: '0',
+        H1: '1',
+        H2: '2',
+        H3: '3',
+        H4: '4',
+        I1: I1_FINAL,
+        client_ip: ADDRESS_LINE,
+        allowed_ips: ALLOWED_IPS.split(', '),
+        mtu: Number(mtu),
+        server_pub_key: peerPub,
+        hostName: ENDPOINT_HOST,
+        port: String(ENDPOINT_PORT),
+        config: config.trimEnd().replace(/\n/g, '\r\n')
+      };
+      const amneziaConfig = {
+        containers: [{
+          container: 'amnezia-awg',
+          awg: {
+            isThirdPartyConfig: true,
+            last_config: JSON.stringify(awgConfig),
+            port: String(ENDPOINT_PORT),
+            transport_proto: 'udp'
+          }
+        }],
+        defaultContainer: 'amnezia-awg',
+        description: 'Cloudflare WARP',
+        hostName: ENDPOINT_HOST
+      };
+      const VPN_KEY = `vpn://${Buffer.from(JSON.stringify(amneziaConfig), 'utf8').toString('base64')}`;
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.status(200).send(VPN_KEY);
+      return;
+    }
 
     res.setHeader('Content-Type', 'text/plain; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="cloudflare-warp.conf"');
