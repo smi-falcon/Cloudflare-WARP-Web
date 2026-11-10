@@ -545,9 +545,9 @@
                     <option value="5">Свои значения</option>
                 </select>
                 <div id="jcCustom" class="field-sub hidden">
-                    <input type="number" id="jcVal" placeholder="Jc (по умолчанию 120)" min="0">
-                    <input type="number" id="jminVal" placeholder="Jmin (по умолчанию 23)" min="0">
-                    <input type="number" id="jmaxVal" placeholder="Jmax (по умолчанию 911)" min="0">
+                    <input type="number" id="jcVal" placeholder="Jc (Max 128)" min="0" max="128">
+                    <input type="number" id="jminVal" placeholder="Jmin (Max 1279)" min="0" max="1279">
+                    <input type="number" id="jmaxVal" placeholder="Jmax (Max 1280)" min="0" max="1280">
                 </div>
             </div>
 
@@ -559,10 +559,17 @@
             <div class="field">
                 <label class="field-label" for="endpoint">Конечная точка (Endpoint)</label>
                 <select id="endpoint">
-                    <option value="1">162.159.192.1:500</option>
-                    <option value="2">162.159.195.1:500</option>
-                    <option value="3">engage.cloudflareclient.com:2408</option>
-                    <option value="4">Указать свой адрес</option>
+                    <option value="1">8.6.112.112:1843</option>
+                    <option value="2">8.34.70.70:2408</option>
+                    <option value="3">8.39.125.125:7103</option>
+                    <option value="4" selected>162.159.192.1:500</option>
+                    <option value="5">162.159.192.7:4500</option>
+                    <option value="6">162.159.195.1:500</option>
+                    <option value="7">162.159.195.38:955</option>
+                    <option value="8">188.114.98.15:934</option>
+                    <option value="9">188.114.99.99:2408</option>
+                    <option value="10">engage.cloudflareclient.com:2408</option>
+                    <option value="11">Свой адрес</option>
                 </select>
                 <div id="customEndpoint" class="field-sub hidden">
                     <input type="text" id="customEndpointValue" placeholder="host:port">
@@ -583,11 +590,11 @@
                 <div class="toggle-row">
                     <span class="toggle-label">PersistentKeepalive</span>
                     <label class="toggle">
-                        <input type="checkbox" id="keepalive" checked>
+                        <input type="checkbox" id="keepalive">
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <div id="keepaliveValue" class="field-sub">
+                <div id="keepaliveValue" class="field-sub hidden">
                     <input type="number" id="keepaliveSec" value="25" min="0" placeholder="Значение в секундах">
                 </div>
             </div>
@@ -631,6 +638,19 @@
                         <option value="9">DNS-AI</option>
                         <option value="10">ZapretDNS</option>
                     </select>
+                </div>
+                <div class="field">
+                    <label class="field-label" for="masqueMtu">MTU</label>
+                    <input type="number" id="masqueMtu" value="1280" min="576" max="1500">
+                </div>
+                <div class="field">
+                    <div class="toggle-row">
+                        <span class="toggle-label">MASQUE & AWG</span>
+                        <label class="toggle">
+                            <input type="checkbox" id="masqueAwg">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
                 </div>
                 <button type="submit" class="submit-btn submit-btn--purple" id="masqueSubmitBtn">Сгенерировать конфигурацию</button>
             </form>
@@ -681,7 +701,7 @@
         });
 
         endpointSelect.addEventListener('change', () => {
-            customEndpointBlock.classList.toggle('hidden', endpointSelect.value !== '4');
+            customEndpointBlock.classList.toggle('hidden', endpointSelect.value !== '11');
         });
 
         function setStatus(message, type) {
@@ -738,7 +758,7 @@
                     };
                 }
 
-                if (endpointChoice === '4') {
+                if (endpointChoice === '11') {
                     payload.endpointCustom = document.getElementById('customEndpointValue').value.trim();
                 }
 
@@ -787,7 +807,8 @@
         document.getElementById('masqueForm').addEventListener('submit', async event => {
             event.preventDefault();
             masqueSubmitBtn.disabled = true;
-            setStatus('Регистрируем MASQUE и собираем YAML...', 'loading');
+            const masqueAwg = document.getElementById('masqueAwg').checked;
+            setStatus(masqueAwg ? 'Регистрируем WARP + MASQUE и собираем YAML...' : 'Регистрируем MASQUE и собираем YAML...', 'loading');
 
             try {
                 const response = await fetch('/api/generate', {
@@ -795,7 +816,9 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         protocol: 'masque',
-                        dnsChoice: document.getElementById('masqueDns').value
+                        dnsChoice: document.getElementById('masqueDns').value,
+                        mtu: parseInt(document.getElementById('masqueMtu').value, 10) || 1280,
+                        masqueAwg
                     })
                 });
 
@@ -813,12 +836,14 @@
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                link.download = 'cloudflare-warp-masque.yaml';
+                link.download = masqueAwg ? 'cloudflare-warp-masque-awg.yaml' : 'cloudflare-warp-masque.yaml';
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
-                setStatus('YAML-конфигурация MASQUE успешно сгенерирована и скачана!', 'success');
+                setStatus(masqueAwg
+                    ? 'YAML-конфигурация MASQUE & AWG успешно сгенерирована и скачана!'
+                    : 'YAML-конфигурация MASQUE успешно сгенерирована и скачана!', 'success');
             } catch (error) {
                 setStatus('Ошибка: ' + error.message, 'error');
             } finally {
